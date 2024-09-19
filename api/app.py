@@ -1,5 +1,13 @@
 import os
 
+# 检查是否处于调试模式，如果不是，则使用 gevent 进行 monkey patch 和 gRPC 初始化
+# gevent 是一个基于协程的 Python 网络库，它通过使用轻量级线程（称为 greenlet）来实现并发。
+# gevent 的 monkey 模块可以对标准库进行 monkey patch，使得标准库中的阻塞操作（如 socket）变成非阻塞的，从而提高并发性能。
+# grpc.experimental.gevent 是 gRPC 的一个实验性模块，用于与 gevent 集成。
+# 通过调用 grpc.experimental.gevent.init_gevent()，可以将 gRPC 的阻塞操作转换为非阻塞操作，从而与 gevent 的协程模型兼容。
+# 假设你有一个 Flask 应用，需要处理多个并发请求，并且每个请求都需要进行一些 I/O 操作（例如数据库查询、文件读写、网络请求等）。
+# 如果使用阻塞编程，每个请求都会阻塞主线程，导致其他请求需要等待。而使用非阻塞编程，可以在等待 I/O 操作时处理其他请求，从而提高并发处理能力。
+
 if os.environ.get("DEBUG", "false").lower() != "true":
     from gevent import monkey
 
@@ -53,7 +61,7 @@ from services.account_service import AccountService
 
 warnings.simplefilter("ignore", ResourceWarning)
 
-# fix windows platform
+# 修复 Windows 平台上的时区设置
 if os.name == "nt":
     os.system('tzutil /s "UTC"')
 else:
@@ -62,6 +70,9 @@ else:
 
 
 class DifyApp(Flask):
+    """
+    自定义的 Flask 应用类，继承自 Flask 类，目前没有添加额外功能。
+    """
     pass
 
 
@@ -70,7 +81,7 @@ class DifyApp(Flask):
 # -------------
 
 
-config_type = os.getenv("EDITION", default="SELF_HOSTED")  # ce edition first
+config_type = os.getenv("EDITION", default="SELF_HOSTED")  # 默认使用 SELF_HOSTED 版本
 
 
 # ----------------------------
@@ -80,13 +91,24 @@ config_type = os.getenv("EDITION", default="SELF_HOSTED")  # ce edition first
 
 def create_flask_app_with_configs() -> Flask:
     """
-    create a raw flask app
-    with configs loaded from .env file
+    创建一个带有配置的 Flask 应用实例。
+    配置从 .env 文件中加载。
     """
     dify_app = DifyApp(__name__)
+    # from_mapping 是 Flask 应用配置的一个方法，用于从字典中加载配置。
+    # 这个方法允许你将一个字典中的键值对直接映射到 Flask 应用的配置中。
+    # 假设 dify_config.model_dump() 返回以下字典：
+    # {
+    #     "SECRET_KEY": "your_secret_key",
+    #     "DEBUG": True,
+    #     "SQLALCHEMY_DATABASE_URI": "postgresql://user:password@localhost/dbname"
+    # }   
+    # 加载进去之后就可以使用app.config["SECRECT_KEY"]
+    # print(app.config["SECRET_KEY"])  # 输出: your_secret_key
+
     dify_app.config.from_mapping(dify_config.model_dump())
 
-    # populate configs into system environment variables
+    # 将配置项填充到系统环境变量中
     for key, value in dify_app.config.items():
         if isinstance(value, str):
             os.environ[key] = value
@@ -99,54 +121,93 @@ def create_flask_app_with_configs() -> Flask:
 
 
 def create_app() -> Flask:
+    """
+    创建并配置 Flask 应用实例。
+
+    该函数的主要用途是创建一个 Flask 应用实例，并对其进行配置。配置包括设置密钥、日志处理、初始化扩展、注册蓝图和命令等。
+
+    参数:
+    无
+
+    返回值:
+    Flask: 配置好的 Flask 应用实例。
+    """
+    # 调用 create_flask_app_with_configs 函数创建一个带有配置的 Flask 应用实例
     app = create_flask_app_with_configs()
 
+    # 设置 Flask 应用的 secret_key，用于加密会话等安全操作
     app.secret_key = app.config["SECRET_KEY"]
 
+    # 初始化日志处理程序列表，默认为 None
     log_handlers = None
+
+    # 从配置中获取日志文件路径
     log_file = app.config.get("LOG_FILE")
+
+    # 如果日志文件路径存在，则配置日志处理程序
     if log_file:
+        # 获取日志文件所在的目录
         log_dir = os.path.dirname(log_file)
+
+        # 确保日志目录存在，如果不存在则创建
         os.makedirs(log_dir, exist_ok=True)
+
+        # 配置日志处理程序，包括文件处理程序和标准输出处理程序
         log_handlers = [
             RotatingFileHandler(
-                filename=log_file,
-                maxBytes=1024 * 1024 * 1024,
-                backupCount=5,
+                filename=log_file,  # 日志文件路径
+                maxBytes=1024 * 1024 * 1024,  # 每个日志文件的最大大小为 1GB
+                backupCount=5,  # 保留 5 个备份日志文件
             ),
-            logging.StreamHandler(sys.stdout),
+            logging.StreamHandler(sys.stdout),  # 标准输出处理程序
         ]
 
+    # 配置日志记录器
     logging.basicConfig(
-        level=app.config.get("LOG_LEVEL"),
-        format=app.config.get("LOG_FORMAT"),
-        datefmt=app.config.get("LOG_DATEFORMAT"),
-        handlers=log_handlers,
-        force=True,
+        level=app.config.get("LOG_LEVEL"),  # 日志级别
+        format=app.config.get("LOG_FORMAT"),  # 日志格式
+        datefmt=app.config.get("LOG_DATEFORMAT"),  # 日期格式
+        handlers=log_handlers,  # 日志处理程序
+        force=True,  # 强制重新配置日志记录器
     )
+
+    # 从配置中获取日志时区
     log_tz = app.config.get("LOG_TZ")
+
+    # 如果日志时区存在，则配置时区转换
     if log_tz:
         from datetime import datetime
-
         import pytz
 
+        # 获取指定时区的时区对象
         timezone = pytz.timezone(log_tz)
 
+        # 定义时间转换函数，将 UTC 时间转换为指定时区的时间
         def time_converter(seconds):
             return datetime.utcfromtimestamp(seconds).astimezone(timezone).timetuple()
 
+        # 为每个日志处理程序设置时间转换函数
         for handler in logging.root.handlers:
             handler.formatter.converter = time_converter
+
+    # 初始化所有 Flask 扩展
     initialize_extensions(app)
+
+    # 注册所有蓝图路由
     register_blueprints(app)
+
+    # 注册所有命令
     register_commands(app)
 
+    # 返回配置好的 Flask 应用实例
     return app
 
 
 def initialize_extensions(app):
-    # Since the application instance is now created, pass it to each Flask
-    # extension instance to bind it to the Flask application instance (app)
+    """
+    初始化所有 Flask 扩展。
+    将 Flask 应用实例传递给每个扩展实例，以绑定到 Flask 应用实例。
+    """
     ext_compress.init_app(app)
     ext_code_based_extension.init()
     ext_database.init_app(app)
@@ -163,10 +224,12 @@ def initialize_extensions(app):
 # Flask-Login configuration
 @login_manager.request_loader
 def load_user_from_request(request_from_flask_login):
-    """Load user based on the request."""
+    """
+    根据请求加载用户。
+    """
     if request.blueprint not in {"console", "inner_api"}:
         return None
-    # Check if the user_id contains a dot, indicating the old format
+    # 检查 user_id 是否包含点，表示旧格式
     auth_header = request.headers.get("Authorization", "")
     if not auth_header:
         auth_token = request.args.get("_token")
@@ -191,7 +254,9 @@ def load_user_from_request(request_from_flask_login):
 
 @login_manager.unauthorized_handler
 def unauthorized_handler():
-    """Handle unauthorized requests."""
+    """
+    处理未授权的请求。
+    """
     return Response(
         json.dumps({"code": "unauthorized", "message": "Unauthorized."}),
         status=401,
@@ -201,6 +266,9 @@ def unauthorized_handler():
 
 # register blueprint routers
 def register_blueprints(app):
+    """
+    注册所有蓝图路由。
+    """
     from controllers.console import bp as console_app_bp
     from controllers.files import bp as files_bp
     from controllers.inner_api import bp as inner_api_bp
@@ -252,7 +320,9 @@ if app.config.get("TESTING"):
 
 @app.after_request
 def after_request(response):
-    """Add Version headers to the response."""
+    """
+    在请求结束后添加版本头到响应中。
+    """
     response.set_cookie("remember_token", "", expires=0)
     response.headers.add("X-Version", app.config["CURRENT_VERSION"])
     response.headers.add("X-Env", app.config["DEPLOY_ENV"])
@@ -261,6 +331,9 @@ def after_request(response):
 
 @app.route("/health")
 def health():
+    """
+    健康检查路由，返回当前进程 ID 和应用版本。
+    """
     return Response(
         json.dumps({"pid": os.getpid(), "status": "ok", "version": app.config["CURRENT_VERSION"]}),
         status=200,
@@ -270,6 +343,9 @@ def health():
 
 @app.route("/threads")
 def threads():
+    """
+    返回当前进程的线程信息。
+    """
     num_threads = threading.active_count()
     threads = threading.enumerate()
 
@@ -296,6 +372,9 @@ def threads():
 
 @app.route("/db-pool-stat")
 def pool_stat():
+    """
+    返回数据库连接池的状态信息。
+    """
     engine = db.engine
     return {
         "pid": os.getpid(),
