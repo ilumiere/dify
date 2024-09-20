@@ -20,14 +20,58 @@ from .types import StringUUID
 
 
 class DifySetup(db.Model):
+    """
+    该类表示 Dify 设置的模型，用于存储和管理 Dify 设置的版本和设置时间。
+
+    主要用途和功能：
+    - 存储 Dify 设置的版本信息。
+    - 记录设置的创建时间。
+
+    属性：
+    - __tablename__: 定义数据库表名为 "dify_setups"。
+    - __table_args__: 定义表的主键约束，以 "version" 字段作为主键，并命名为 "dify_setup_pkey"。
+    - version: 存储 Dify 设置的版本号，类型为字符串，最大长度为 255，不可为空。
+    - setup_at: 存储设置的创建时间，类型为 DateTime，不可为空，默认值为当前时间。
+    """
+
     __tablename__ = "dify_setups"
     __table_args__ = (db.PrimaryKeyConstraint("version", name="dify_setup_pkey"),)
 
     version = db.Column(db.String(255), nullable=False)
+    """
+    version: 存储 Dify 设置的版本号。
+    - 类型: 字符串，最大长度为 255。
+    - 约束: 不可为空。
+    - 用途: 用于标识 Dify 设置的版本。
+    """
+
     setup_at = db.Column(db.DateTime, nullable=False, server_default=db.text("CURRENT_TIMESTAMP(0)"))
+    """
+    setup_at: 存储设置的创建时间。
+    - 类型: DateTime。
+    - 约束: 不可为空。
+    - 默认值: 当前时间。
+    - 用途: 记录 Dify 设置的创建时间。
+    """
 
 
 class AppMode(Enum):
+    """
+    该类表示应用程序模式的枚举类，用于定义和获取应用程序的不同模式。
+
+    主要用途和功能：
+    - 定义应用程序的不同模式，如 COMPLETION、WORKFLOW、CHAT 等。
+    - 提供一个类方法 `value_of`，用于根据给定的模式值获取对应的枚举对象。
+
+    属性：
+    - COMPLETION: 表示完成模式。
+    - WORKFLOW: 表示工作流模式。
+    - CHAT: 表示聊天模式。
+    - ADVANCED_CHAT: 表示高级聊天模式。
+    - AGENT_CHAT: 表示代理聊天模式。
+    - CHANNEL: 表示频道模式。
+    """
+
     COMPLETION = "completion"
     WORKFLOW = "workflow"
     CHAT = "chat"
@@ -35,13 +79,32 @@ class AppMode(Enum):
     AGENT_CHAT = "agent-chat"
     CHANNEL = "channel"
 
+
+
+    # 在 Python 中，枚举类的成员是类的实例，而不是字符串。
+    # 当在类方法中返回枚举成员时，返回的是一个枚举实例，而不是字符串。
+    # 为了明确表示返回的是一个枚举实例，通常会在类型注解中使用双引号括起来。
+    # 双引号：在类型注解中使用双引号是为了避免循环导入问题。如果直接写 -> AppMode，
+    # 可能会导致循环导入错误，因为 AppMode 类还没有完全定义。
     @classmethod
     def value_of(cls, value: str) -> "AppMode":
         """
-        Get value of given mode.
+        根据给定的模式值获取对应的枚举对象。
 
-        :param value: mode value
-        :return: mode
+        参数：
+        - value: 表示要查找的模式值，类型为字符串。
+
+        返回值：
+        - 返回与给定值匹配的 AppMode 枚举对象。
+
+        异常：
+        - 如果找不到匹配的模式值，抛出 ValueError 异常。
+
+        功能：
+        - 遍历 AppMode 枚举类的所有成员。
+        - 检查每个成员的值是否与给定的值匹配。
+        - 如果找到匹配的值，返回对应的枚举对象。
+        - 如果未找到匹配的值，抛出 ValueError 异常，提示无效的模式值。
         """
         for mode in cls:
             if mode.value == value:

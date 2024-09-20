@@ -244,29 +244,75 @@ class TokenManager:
 
 
 class RateLimiter:
+    """
+    速率限制器类，用于限制特定时间段内某个邮箱地址的请求次数。
+
+    属性:
+    - prefix (str): 用于生成 Redis 键的前缀，通常表示速率限制的类型或用途。
+    - max_attempts (int): 在指定时间窗口内允许的最大请求次数。
+    - time_window (int): 时间窗口的长度，单位为秒。
+    """
+
     def __init__(self, prefix: str, max_attempts: int, time_window: int):
+        """
+        初始化速率限制器实例。
+
+        参数:
+        - prefix (str): Redis 键的前缀。
+        - max_attempts (int): 允许的最大请求次数。
+        - time_window (int): 时间窗口的长度，单位为秒。
+        """
         self.prefix = prefix
         self.max_attempts = max_attempts
         self.time_window = time_window
 
     def _get_key(self, email: str) -> str:
+        """
+        生成用于存储速率限制信息的 Redis 键。
+
+        参数:
+        - email (str): 邮箱地址。
+
+        返回:
+        - str: 生成的 Redis 键。
+        """
         return f"{self.prefix}:{email}"
 
     def is_rate_limited(self, email: str) -> bool:
+        """
+        检查指定邮箱地址是否已达到速率限制。
+
+        参数:
+        - email (str): 邮箱地址。
+
+        返回:
+        - bool: 如果已达到速率限制，返回 True；否则返回 False。
+        """
         key = self._get_key(email)
         current_time = int(time.time())
         window_start_time = current_time - self.time_window
 
+        # 删除时间窗口外的记录
         redis_client.zremrangebyscore(key, "-inf", window_start_time)
+        # 获取当前时间窗口内的请求次数
         attempts = redis_client.zcard(key)
 
+        # 如果请求次数超过最大限制，返回 True
         if attempts and int(attempts) >= self.max_attempts:
             return True
         return False
 
     def increment_rate_limit(self, email: str):
+        """
+        增加指定邮箱地址的请求次数，并更新 Redis 中的记录。
+
+        参数:
+        - email (str): 邮箱地址。
+        """
         key = self._get_key(email)
         current_time = int(time.time())
 
+        # 将当前时间添加到 Redis 有序集合中
         redis_client.zadd(key, {current_time: current_time})
+        # 设置键的过期时间，为时间窗口的两倍
         redis_client.expire(key, self.time_window * 2)
