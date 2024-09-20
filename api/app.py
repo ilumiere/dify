@@ -345,28 +345,45 @@ def health():
 def threads():
     """
     返回当前进程的线程信息。
+
+    该函数的主要用途是提供一个路由，用于获取当前进程的线程信息。
+    通过访问该路由，用户可以获取到当前进程中所有线程的详细信息，包括线程名称、线程ID以及线程是否存活。
+
+    返回值：
+    - 返回一个包含线程信息的字典，字典的键包括：
+        - "pid": 当前进程的ID。
+        - "thread_num": 当前进程中的线程总数。
+        - "threads": 一个包含所有线程信息的列表，每个线程信息为一个字典，包含线程名称、线程ID和线程是否存活的标志。
     """
+    # 获取当前进程中的线程总数
     num_threads = threading.active_count()
+    
+    # 获取当前进程中所有线程的枚举列表
     threads = threading.enumerate()
 
+    # 初始化一个空列表，用于存储每个线程的详细信息
     thread_list = []
+    
+    # 遍历所有线程，获取每个线程的名称、ID和是否存活的标志
     for thread in threads:
-        thread_name = thread.name
-        thread_id = thread.ident
-        is_alive = thread.is_alive()
+        thread_name = thread.name  # 获取线程的名称
+        thread_id = thread.ident  # 获取线程的ID
+        is_alive = thread.is_alive()  # 判断线程是否存活
 
+        # 将线程的详细信息添加到列表中
         thread_list.append(
             {
-                "name": thread_name,
-                "id": thread_id,
-                "is_alive": is_alive,
+                "name": thread_name,  # 线程名称
+                "id": thread_id,  # 线程ID
+                "is_alive": is_alive,  # 线程是否存活
             }
         )
 
+    # 返回包含线程信息的字典
     return {
-        "pid": os.getpid(),
-        "thread_num": num_threads,
-        "threads": thread_list,
+        "pid": os.getpid(),  # 当前进程的ID
+        "thread_num": num_threads,  # 当前进程中的线程总数
+        "threads": thread_list,  # 包含所有线程信息的列表
     }
 
 
@@ -374,16 +391,29 @@ def threads():
 def pool_stat():
     """
     返回数据库连接池的状态信息。
+
+    该函数的主要用途是提供一个路由，用于获取当前数据库连接池的状态信息。
+    通过访问该路由，用户可以获取到数据库连接池的各项指标，包括连接池大小、已检查入的连接数、已检查出的连接数、溢出连接数、连接超时时间以及连接回收时间。
+
+    返回值：
+    - 返回一个包含数据库连接池状态信息的字典，字典的键包括：
+        - "pid": 当前进程的ID。
+        - "pool_size": 连接池的总大小。
+        - "checked_in_connections": 已检查入的连接数。
+        - "checked_out_connections": 已检查出的连接数。
+        - "overflow_connections": 溢出连接数。
+        - "connection_timeout": 连接超时时间。
+        - "recycle_time": 连接回收时间。
     """
-    engine = db.engine
+    engine = db.engine  # 获取数据库引擎实例
     return {
-        "pid": os.getpid(),
-        "pool_size": engine.pool.size(),
-        "checked_in_connections": engine.pool.checkedin(),
-        "checked_out_connections": engine.pool.checkedout(),
-        "overflow_connections": engine.pool.overflow(),
-        "connection_timeout": engine.pool.timeout(),
-        "recycle_time": db.engine.pool._recycle,
+        "pid": os.getpid(),  # 获取当前进程的ID
+        "pool_size": engine.pool.size(),  # 获取连接池的总大小
+        "checked_in_connections": engine.pool.checkedin(),  # 获取已检查入的连接数
+        "checked_out_connections": engine.pool.checkedout(),  # 获取已检查出的连接数
+        "overflow_connections": engine.pool.overflow(),  # 获取溢出连接数
+        "connection_timeout": engine.pool.timeout(),  # 获取连接超时时间
+        "recycle_time": db.engine.pool._recycle,  # 获取连接回收时间
     }
 
 
