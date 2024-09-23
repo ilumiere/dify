@@ -1203,88 +1203,219 @@ class CeleryBeatConfig(BaseSettings):
 
 
 class PositionConfig(BaseSettings):
+    """
+    PositionConfig 类用于管理模型提供者和工具的位置配置。
+
+    该类继承自 `BaseSettings`，用于从环境变量或配置文件中加载配置。主要用途是定义模型提供者和工具的固定、包含和排除列表。
+    """
+
     POSITION_PROVIDER_PINS: str = Field(
-        description="The heads of model providers",
+        description="模型提供者的头部列表，以逗号分隔的字符串形式表示。",
         default="",
     )
+    """
+    POSITION_PROVIDER_PINS 属性：
+    - 类型：str
+    - 描述：模型提供者的头部列表，以逗号分隔的字符串形式表示。
+    - 默认值：""
+    - 说明：该属性定义了模型提供者的头部列表，用于固定某些模型提供者的位置。
+    """
 
     POSITION_PROVIDER_INCLUDES: str = Field(
-        description="The included model providers",
+        description="包含的模型提供者列表，以逗号分隔的字符串形式表示。",
         default="",
     )
+    """
+    POSITION_PROVIDER_INCLUDES 属性：
+    - 类型：str
+    - 描述：包含的模型提供者列表，以逗号分隔的字符串形式表示。
+    - 默认值：""
+    - 说明：该属性定义了包含的模型提供者列表，用于指定需要包含的模型提供者。
+    """
 
     POSITION_PROVIDER_EXCLUDES: str = Field(
-        description="The excluded model providers",
+        description="排除的模型提供者列表，以逗号分隔的字符串形式表示。",
         default="",
     )
+    """
+    POSITION_PROVIDER_EXCLUDES 属性：
+    - 类型：str
+    - 描述：排除的模型提供者列表，以逗号分隔的字符串形式表示。
+    - 默认值：""
+    - 说明：该属性定义了排除的模型提供者列表，用于指定需要排除的模型提供者。
+    """
 
     POSITION_TOOL_PINS: str = Field(
-        description="The heads of tools",
+        description="工具的头部列表，以逗号分隔的字符串形式表示。",
         default="",
     )
+    """
+    POSITION_TOOL_PINS 属性：
+    - 类型：str
+    - 描述：工具的头部列表，以逗号分隔的字符串形式表示。
+    - 默认值：""
+    - 说明：该属性定义了工具的头部列表，用于固定某些工具的位置。
+    """
 
     POSITION_TOOL_INCLUDES: str = Field(
-        description="The included tools",
+        description="包含的工具列表，以逗号分隔的字符串形式表示。",
         default="",
     )
+    """
+    POSITION_TOOL_INCLUDES 属性：
+    - 类型：str
+    - 描述：包含的工具列表，以逗号分隔的字符串形式表示。
+    - 默认值：""
+    - 说明：该属性定义了包含的工具列表，用于指定需要包含的工具。
+    """
 
     POSITION_TOOL_EXCLUDES: str = Field(
-        description="The excluded tools",
+        description="排除的工具列表，以逗号分隔的字符串形式表示。",
         default="",
     )
+    """
+    POSITION_TOOL_EXCLUDES 属性：
+    - 类型：str
+    - 描述：排除的工具列表，以逗号分隔的字符串形式表示。
+    - 默认值：""
+    - 说明：该属性定义了排除的工具列表，用于指定需要排除的工具。
+    """
 
     @computed_field
     def POSITION_PROVIDER_PINS_LIST(self) -> list[str]:
+        """
+        计算并返回模型提供者的头部列表。
+
+        该方法将 `POSITION_PROVIDER_PINS` 属性中的逗号分隔字符串转换为列表，并去除每个元素的前后空白。
+
+        :return: 模型提供者的头部列表。
+        :rtype: list[str]
+        """
         return [item.strip() for item in self.POSITION_PROVIDER_PINS.split(",") if item.strip() != ""]
 
     @computed_field
     def POSITION_PROVIDER_INCLUDES_SET(self) -> set[str]:
+        """
+        计算并返回包含的模型提供者集合。
+
+        该方法将 `POSITION_PROVIDER_INCLUDES` 属性中的逗号分隔字符串转换为集合，并去除每个元素的前后空白。
+
+        :return: 包含的模型提供者集合。
+        :rtype: set[str]
+        """
         return {item.strip() for item in self.POSITION_PROVIDER_INCLUDES.split(",") if item.strip() != ""}
 
     @computed_field
     def POSITION_PROVIDER_EXCLUDES_SET(self) -> set[str]:
+        """
+        计算并返回排除的模型提供者集合。
+
+        该方法将 `POSITION_PROVIDER_EXCLUDES` 属性中的逗号分隔字符串转换为集合，并去除每个元素的前后空白。
+
+        :return: 排除的模型提供者集合。
+        :rtype: set[str]
+        """
         return {item.strip() for item in self.POSITION_PROVIDER_EXCLUDES.split(",") if item.strip() != ""}
 
     @computed_field
     def POSITION_TOOL_PINS_LIST(self) -> list[str]:
+        """
+        计算并返回工具的头部列表。
+
+        该方法将 `POSITION_TOOL_PINS` 属性中的逗号分隔字符串转换为列表，并去除每个元素的前后空白。
+
+        :return: 工具的头部列表。
+        :rtype: list[str]
+        """
         return [item.strip() for item in self.POSITION_TOOL_PINS.split(",") if item.strip() != ""]
 
     @computed_field
     def POSITION_TOOL_INCLUDES_SET(self) -> set[str]:
+        """
+        计算并返回包含的工具集合。
+
+        该方法将 `POSITION_TOOL_INCLUDES` 属性中的逗号分隔字符串转换为集合，并去除每个元素的前后空白。
+
+        :return: 包含的工具集合。
+        :rtype: set[str]
+        """
         return {item.strip() for item in self.POSITION_TOOL_INCLUDES.split(",") if item.strip() != ""}
 
     @computed_field
     def POSITION_TOOL_EXCLUDES_SET(self) -> set[str]:
+        """
+        计算并返回排除的工具集合。
+
+        该方法将 `POSITION_TOOL_EXCLUDES` 属性中的逗号分隔字符串转换为集合，并去除每个元素的前后空白。
+
+        :return: 排除的工具集合。
+        :rtype: set[str]
+        """
         return {item.strip() for item in self.POSITION_TOOL_EXCLUDES.split(",") if item.strip() != ""}
 
 
 class FeatureConfig(
-    # place the configs in alphabet order
-    AppExecutionConfig,
-    BillingConfig,
-    CodeExecutionSandboxConfig,
-    DataSetConfig,
-    EndpointConfig,
-    FileAccessConfig,
-    FileUploadConfig,
-    HttpConfig,
-    ImageFormatConfig,
-    InnerAPIConfig,
-    IndexingConfig,
-    LoggingConfig,
-    MailConfig,
-    ModelLoadBalanceConfig,
-    ModerationConfig,
-    OAuthConfig,
-    RagEtlConfig,
-    SecurityConfig,
-    ToolConfig,
-    UpdateConfig,
-    WorkflowConfig,
-    WorkspaceConfig,
-    PositionConfig,
-    # hosted services config
-    HostedServiceConfig,
-    CeleryBeatConfig,
+    # 按字母顺序排列配置
+    AppExecutionConfig,  # 应用执行配置
+    BillingConfig,  # 计费配置
+    CodeExecutionSandboxConfig,  # 代码执行沙箱配置
+    DataSetConfig,  # 数据集配置
+    EndpointConfig,  # 端点配置
+    FileAccessConfig,  # 文件访问配置
+    FileUploadConfig,  # 文件上传配置
+    HttpConfig,  # HTTP 配置
+    ImageFormatConfig,  # 图像格式配置
+    InnerAPIConfig,  # 内部 API 配置
+    IndexingConfig,  # 索引配置
+    LoggingConfig,  # 日志配置
+    MailConfig,  # 邮件配置
+    ModelLoadBalanceConfig,  # 模型负载均衡配置
+    ModerationConfig,  # 内容审核配置
+    OAuthConfig,  # OAuth 配置
+    RagEtlConfig,  # Rag ETL 配置
+    SecurityConfig,  # 安全配置
+    ToolConfig,  # 工具配置
+    UpdateConfig,  # 更新配置
+    WorkflowConfig,  # 工作流配置
+    WorkspaceConfig,  # 工作区配置
+    PositionConfig,  # 位置配置
+    # 托管服务配置
+    HostedServiceConfig,  # 托管服务配置
+    CeleryBeatConfig,  # Celery Beat 配置
 ):
+    """
+    功能配置类，继承了多个配置类，用于管理应用程序的各种配置。
+    仅仅是作为聚合类
+
+    该类的主要用途是集中管理应用程序的各种配置，确保所有配置项都能在一个类中统一管理和访问。
+
+    继承的配置类包括：
+    - AppExecutionConfig: 应用执行配置
+    - BillingConfig: 计费配置
+    - CodeExecutionSandboxConfig: 代码执行沙箱配置
+    - DataSetConfig: 数据集配置
+    - EndpointConfig: 端点配置
+    - FileAccessConfig: 文件访问配置
+    - FileUploadConfig: 文件上传配置
+    - HttpConfig: HTTP 配置
+    - ImageFormatConfig: 图像格式配置
+    - InnerAPIConfig: 内部 API 配置
+    - IndexingConfig: 索引配置
+    - LoggingConfig: 日志配置
+    - MailConfig: 邮件配置
+    - ModelLoadBalanceConfig: 模型负载均衡配置
+    - ModerationConfig: 内容审核配置
+    - OAuthConfig: OAuth 配置
+    - RagEtlConfig: Rag ETL 配置
+    - SecurityConfig: 安全配置
+    - ToolConfig: 工具配置
+    - UpdateConfig: 更新配置
+    - WorkflowConfig: 工作流配置
+    - WorkspaceConfig: 工作区配置
+    - PositionConfig: 位置配置
+    - HostedServiceConfig: 托管服务配置
+    - CeleryBeatConfig: Celery Beat 配置
+
+    该类本身没有定义额外的属性和方法，仅用于继承和集中管理配置。
+    """
     pass
