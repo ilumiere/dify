@@ -17,11 +17,34 @@ logger = logging.getLogger(__name__)
 
 
 class ModelProviderExtension(BaseModel):
+    """
+    ModelProviderExtension 类用于扩展模型提供者的功能。它继承自 Pydantic 的 BaseModel，并允许使用任意类型的属性。
+    该类的主要用途是封装模型提供者的实例及其相关属性，以便在模型提供者工厂中使用。
+    """
+
     model_config = ConfigDict(arbitrary_types_allowed=True)
+    """
+    model_config 是一个配置字典，用于定义 Pydantic 模型的行为。
+    这里设置 `arbitrary_types_allowed=True`，允许模型中使用任意类型的属性。
+    """
 
     provider_instance: ModelProvider
+    """
+    provider_instance 是一个 ModelProvider 实例，表示具体的模型提供者。
+    该属性用于存储模型提供者的实例，以便在需要时调用其方法。
+    """
+
     name: str
+    """
+    name 是一个字符串，表示模型提供者的名称。
+    该属性用于标识具体的模型提供者，通常用于日志记录或错误处理。
+    """
+
     position: Optional[int] = None
+    """
+    position 是一个可选的整数，表示模型提供者的位置。
+    该属性用于指定模型提供者在某些操作中的顺序或优先级，默认为 None。
+    """
 
 
 class ModelProviderFactory:
