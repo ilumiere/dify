@@ -35,6 +35,11 @@ logger = logging.getLogger(__name__)
 
 
 class MessageBasedAppGenerator(BaseAppGenerator):
+    """
+    基于消息的应用程序生成器类，继承自 BaseAppGenerator。
+    主要用途是处理应用程序生成的响应，并根据不同的生成实体类型进行相应的处理。
+    """
+
     def _handle_response(
         self,
         application_generate_entity: Union[
@@ -54,16 +59,21 @@ class MessageBasedAppGenerator(BaseAppGenerator):
         Generator[Union[ChatbotAppStreamResponse, CompletionAppStreamResponse], None, None],
     ]:
         """
-        Handle response.
-        :param application_generate_entity: application generate entity
-        :param queue_manager: queue manager
-        :param conversation: conversation
-        :param message: message
-        :param user: user
-        :param stream: is stream
-        :return:
+        处理应用程序生成的响应。
+
+        参数:
+        - application_generate_entity: 应用程序生成实体，可以是 ChatAppGenerateEntity, CompletionAppGenerateEntity, AgentChatAppGenerateEntity, 或 AdvancedChatAppGenerateEntity。
+        - queue_manager: 队列管理器，用于管理任务队列。
+        - conversation: 对话对象，表示当前的对话。
+        - message: 消息对象，表示当前的消息。
+        - user: 用户对象，可以是 Account 或 EndUser。
+        - stream: 是否为流式响应，默认为 False。
+
+        返回值:
+        - 如果 stream 为 False，返回 ChatbotAppBlockingResponse 或 CompletionAppBlockingResponse。
+        - 如果 stream 为 True，返回一个生成器，生成 ChatbotAppStreamResponse 或 CompletionAppStreamResponse。
         """
-        # init generate task pipeline
+        # 初始化生成任务管道
         generate_task_pipeline = EasyUIBasedGenerateTaskPipeline(
             application_generate_entity=application_generate_entity,
             queue_manager=queue_manager,
@@ -74,54 +84,94 @@ class MessageBasedAppGenerator(BaseAppGenerator):
         )
 
         try:
+            # 处理生成任务管道
             return generate_task_pipeline.process()
         except ValueError as e:
-            if e.args[0] == "I/O operation on closed file.":  # ignore this error
+            # 捕获 ValueError 异常，如果是 "I/O operation on closed file." 错误，则抛出 GenerateTaskStoppedError
+            if e.args[0] == "I/O operation on closed file.":
                 raise GenerateTaskStoppedError()
             else:
+                # 记录异常并重新抛出
                 logger.exception(e)
                 raise e
 
     def _get_conversation_by_user(
         self, app_model: App, conversation_id: str, user: Union[Account, EndUser]
     ) -> Conversation:
+        """
+        根据用户和对话ID获取对话对象。
+
+        参数:
+        - app_model: 应用程序模型对象。
+        - conversation_id: 对话ID。
+        - user: 用户对象，可以是 Account 或 EndUser。
+
+        返回值:
+        - 对话对象。
+
+        异常:
+        - ConversationNotExistsError: 如果对话不存在，抛出此异常。
+        - ConversationCompletedError: 如果对话已完成，抛出此异常。
+        """
+        # 构建对话过滤条件
         conversation_filter = [
             Conversation.id == conversation_id,
             Conversation.app_id == app_model.id,
             Conversation.status == "normal",
         ]
 
+        # 根据用户类型添加过滤条件
         if isinstance(user, Account):
             conversation_filter.append(Conversation.from_account_id == user.id)
         else:
             conversation_filter.append(Conversation.from_end_user_id == user.id if user else None)
 
+        # 查询对话对象
         conversation = db.session.query(Conversation).filter(and_(*conversation_filter)).first()
 
+        # 如果对话不存在，抛出异常
         if not conversation:
             raise ConversationNotExistsError()
 
+        # 如果对话已完成，抛出异常
         if conversation.status != "normal":
             raise ConversationCompletedError()
 
         return conversation
 
     def _get_app_model_config(self, app_model: App, conversation: Optional[Conversation] = None) -> AppModelConfig:
+        """
+        获取应用程序模型配置。
+
+        参数:
+        - app_model: 应用程序模型对象。
+        - conversation: 对话对象，可选。
+
+        返回值:
+        - 应用程序模型配置对象。
+
+        异常:
+        - AppModelConfigBrokenError: 如果应用程序模型配置不存在或损坏，抛出此异常。
+        """
         if conversation:
+            # 根据对话对象获取应用程序模型配置
             app_model_config = (
                 db.session.query(AppModelConfig)
                 .filter(AppModelConfig.id == conversation.app_model_config_id, AppModelConfig.app_id == app_model.id)
                 .first()
             )
 
+            # 如果应用程序模型配置不存在，抛出异常
             if not app_model_config:
                 raise AppModelConfigBrokenError()
         else:
+            # 如果对话对象不存在，直接从应用程序模型中获取配置
             if app_model.app_model_config_id is None:
                 raise AppModelConfigBrokenError()
 
             app_model_config = app_model.app_model_config
 
+            # 如果应用程序模型配置不存在，抛出异常
             if not app_model_config:
                 raise AppModelConfigBrokenError()
 
@@ -138,14 +188,18 @@ class MessageBasedAppGenerator(BaseAppGenerator):
         conversation: Optional[Conversation] = None,
     ) -> tuple[Conversation, Message]:
         """
-        Initialize generate records
-        :param application_generate_entity: application generate entity
-        :conversation conversation
-        :return:
+        初始化生成记录。
+
+        参数:
+        - application_generate_entity: 应用程序生成实体，可以是 ChatAppGenerateEntity, CompletionAppGenerateEntity, AgentChatAppGenerateEntity, 或 AdvancedChatAppGenerateEntity。
+        - conversation: 对话对象，可选。
+
+        返回值:
+        - 包含对话对象和消息对象的元组。
         """
         app_config = application_generate_entity.app_config
 
-        # get from source
+        # 获取来源
         end_user_id = None
         account_id = None
         if application_generate_entity.invoke_from in {InvokeFrom.WEB_APP, InvokeFrom.SERVICE_API}:
@@ -155,6 +209,7 @@ class MessageBasedAppGenerator(BaseAppGenerator):
             from_source = "console"
             account_id = application_generate_entity.user_id
 
+        # 如果是 AdvancedChatAppGenerateEntity，设置相关配置为 None
         if isinstance(application_generate_entity, AdvancedChatAppGenerateEntity):
             app_model_config_id = None
             override_model_configs = None
@@ -172,9 +227,10 @@ class MessageBasedAppGenerator(BaseAppGenerator):
             }:
                 override_model_configs = app_config.app_model_config_dict
 
-        # get conversation introduction
+        # 获取对话介绍
         introduction = self._get_conversation_introduction(application_generate_entity)
 
+        # 如果没有对话对象，创建新的对话对象
         if not conversation:
             conversation = Conversation(
                 app_id=app_config.app_id,
@@ -199,9 +255,11 @@ class MessageBasedAppGenerator(BaseAppGenerator):
             db.session.commit()
             db.session.refresh(conversation)
         else:
+            # 更新对话对象的更新时间
             conversation.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)
             db.session.commit()
 
+        # 创建消息对象
         message = Message(
             app_id=app_config.app_id,
             model_provider=model_provider,
@@ -231,6 +289,7 @@ class MessageBasedAppGenerator(BaseAppGenerator):
         db.session.commit()
         db.session.refresh(message)
 
+        # 处理文件
         for file in application_generate_entity.files:
             message_file = MessageFile(
                 message_id=message.id,
@@ -249,13 +308,18 @@ class MessageBasedAppGenerator(BaseAppGenerator):
 
     def _get_conversation_introduction(self, application_generate_entity: AppGenerateEntity) -> str:
         """
-        Get conversation introduction
-        :param application_generate_entity: application generate entity
-        :return: conversation introduction
+        获取对话介绍。
+
+        参数:
+        - application_generate_entity: 应用程序生成实体。
+
+        返回值:
+        - 对话介绍字符串。
         """
         app_config = application_generate_entity.app_config
         introduction = app_config.additional_features.opening_statement
 
+        # 如果存在对话介绍，尝试格式化
         if introduction:
             try:
                 inputs = application_generate_entity.inputs
@@ -267,11 +331,18 @@ class MessageBasedAppGenerator(BaseAppGenerator):
 
         return introduction
 
-    def _get_conversation(self, conversation_id: str):
+    def _get_conversation(self, conversation_id: str) -> Conversation:
         """
-        Get conversation by conversation id
-        :param conversation_id: conversation id
-        :return: conversation
+        根据对话ID获取对话对象。
+
+        参数:
+        - conversation_id: 对话ID。
+
+        返回值:
+        - 对话对象。
+
+        异常:
+        - ConversationNotExistsError: 如果对话不存在，抛出此异常。
         """
         conversation = db.session.query(Conversation).filter(Conversation.id == conversation_id).first()
 
@@ -282,9 +353,13 @@ class MessageBasedAppGenerator(BaseAppGenerator):
 
     def _get_message(self, message_id: str) -> Message:
         """
-        Get message by message id
-        :param message_id: message id
-        :return: message
+        根据消息ID获取消息对象。
+
+        参数:
+        - message_id: 消息ID。
+
+        返回值:
+        - 消息对象。
         """
         message = db.session.query(Message).filter(Message.id == message_id).first()
 

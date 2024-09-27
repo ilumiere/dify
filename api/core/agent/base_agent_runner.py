@@ -48,6 +48,10 @@ logger = logging.getLogger(__name__)
 
 
 class BaseAgentRunner(AppRunner):
+    """
+    BaseAgentRunner 类是用于管理和执行代理运行的基类。它继承自 AppRunner，并负责初始化代理运行所需的各种参数和工具。
+    """
+
     def __init__(
         self,
         tenant_id: str,
@@ -66,21 +70,22 @@ class BaseAgentRunner(AppRunner):
         model_instance: ModelInstance = None,
     ) -> None:
         """
-        Agent runner
-        :param tenant_id: tenant id
-        :param application_generate_entity: application generate entity
-        :param conversation: conversation
-        :param app_config: app generate entity
-        :param model_config: model config
-        :param config: dataset config
-        :param queue_manager: queue manager
-        :param message: message
-        :param user_id: user id
-        :param memory: memory
-        :param prompt_messages: prompt messages
-        :param variables_pool: variables pool
-        :param db_variables: db variables
-        :param model_instance: model instance
+        初始化 BaseAgentRunner 实例。
+
+        :param tenant_id: 租户ID，标识租户的唯一字符串。
+        :param application_generate_entity: 应用生成实体，包含应用生成的相关信息。
+        :param conversation: 对话对象，包含当前对话的所有信息。
+        :param app_config: 应用配置对象，包含应用的配置信息。
+        :param model_config: 模型配置对象，包含模型的配置信息。
+        :param config: 数据集配置对象，包含数据集的配置信息。
+        :param queue_manager: 队列管理器对象，用于管理任务队列。
+        :param message: 消息对象，包含当前消息的所有信息。
+        :param user_id: 用户ID，标识用户的唯一字符串。
+        :param memory: 可选参数，内存对象，用于存储和管理内存数据。
+        :param prompt_messages: 可选参数，提示消息列表，包含所有提示消息。
+        :param variables_pool: 可选参数，变量池对象，用于存储和管理变量。
+        :param db_variables: 可选参数，数据库变量对象，用于存储和管理数据库变量。
+        :param model_instance: 可选参数，模型实例对象，用于存储和管理模型实例。
         """
         self.tenant_id = tenant_id
         self.application_generate_entity = application_generate_entity
@@ -97,9 +102,9 @@ class BaseAgentRunner(AppRunner):
         self.db_variables_pool = db_variables
         self.model_instance = model_instance
 
-        # init callback
+        # 初始化回调处理程序
         self.agent_callback = DifyAgentCallbackHandler()
-        # init dataset tools
+        # 初始化数据集工具
         hit_callback = DatasetIndexToolCallbackHandler(
             queue_manager=queue_manager,
             app_id=self.app_config.app_id,
@@ -115,7 +120,7 @@ class BaseAgentRunner(AppRunner):
             invoke_from=application_generate_entity.invoke_from,
             hit_callback=hit_callback,
         )
-        # get how many agent thoughts have been created
+        # 获取已创建的代理思考数量
         self.agent_thought_count = (
             db.session.query(MessageAgentThought)
             .filter(
@@ -125,7 +130,7 @@ class BaseAgentRunner(AppRunner):
         )
         db.session.close()
 
-        # check if model supports stream tool call
+        # 检查模型是否支持流式工具调用
         llm_model = cast(LargeLanguageModel, model_instance.model_type_instance)
         model_schema = llm_model.get_model_schema(model_instance.model, model_instance.credentials)
         if model_schema and ModelFeature.STREAM_TOOL_CALL in (model_schema.features or []):
@@ -133,7 +138,7 @@ class BaseAgentRunner(AppRunner):
         else:
             self.stream_tool_call = False
 
-        # check if model supports vision
+        # 检查模型是否支持视觉功能
         if model_schema and ModelFeature.VISION in (model_schema.features or []):
             self.files = application_generate_entity.files
         else:
@@ -145,7 +150,12 @@ class BaseAgentRunner(AppRunner):
         self, app_generate_entity: AgentChatAppGenerateEntity
     ) -> AgentChatAppGenerateEntity:
         """
-        Repack app generate entity
+        重新打包应用生成实体。
+
+        如果应用生成实体的简单提示模板为空，则将其设置为空字符串。
+
+        :param app_generate_entity: 应用生成实体对象。
+        :return: 重新打包后的应用生成实体对象。
         """
         if app_generate_entity.app_config.prompt_template.simple_prompt_template is None:
             app_generate_entity.app_config.prompt_template.simple_prompt_template = ""
@@ -154,7 +164,12 @@ class BaseAgentRunner(AppRunner):
 
     def _convert_tool_to_prompt_message_tool(self, tool: AgentToolEntity) -> tuple[PromptMessageTool, Tool]:
         """
-        convert tool to prompt message tool
+        将工具转换为提示消息工具。
+
+        获取工具的运行时参数，并将其转换为提示消息工具的参数格式。
+
+        :param tool: 工具实体对象。
+        :return: 包含提示消息工具和工具实体的元组。
         """
         tool_entity = ToolManager.get_agent_tool_runtime(
             tenant_id=self.tenant_id,
@@ -199,7 +214,12 @@ class BaseAgentRunner(AppRunner):
 
     def _convert_dataset_retriever_tool_to_prompt_message_tool(self, tool: DatasetRetrieverTool) -> PromptMessageTool:
         """
-        convert dataset retriever tool to prompt message tool
+        将数据集检索工具转换为提示消息工具。
+
+        获取数据集检索工具的运行时参数，并将其转换为提示消息工具的参数格式。
+
+        :param tool: 数据集检索工具对象。
+        :return: 提示消息工具对象。
         """
         prompt_tool = PromptMessageTool(
             name=tool.identity.name,
@@ -227,7 +247,11 @@ class BaseAgentRunner(AppRunner):
 
     def _init_prompt_tools(self) -> tuple[Mapping[str, Tool], Sequence[PromptMessageTool]]:
         """
-        Init tools
+        初始化提示工具。
+
+        遍历应用配置中的工具和数据集工具，将其转换为提示消息工具，并保存工具实例和提示消息工具。
+
+        :return: 包含工具实例映射和提示消息工具序列的元组。
         """
         tool_instances = {}
         prompt_messages_tools = []
@@ -236,28 +260,34 @@ class BaseAgentRunner(AppRunner):
             try:
                 prompt_tool, tool_entity = self._convert_tool_to_prompt_message_tool(tool)
             except Exception:
-                # api tool may be deleted
+                # 工具可能已被删除
                 continue
-            # save tool entity
+            # 保存工具实体
             tool_instances[tool.tool_name] = tool_entity
-            # save prompt tool
+            # 保存提示工具
             prompt_messages_tools.append(prompt_tool)
 
-        # convert dataset tools into ModelRuntime Tool format
+        # 将数据集工具转换为 ModelRuntime 工具格式
         for dataset_tool in self.dataset_tools:
             prompt_tool = self._convert_dataset_retriever_tool_to_prompt_message_tool(dataset_tool)
-            # save prompt tool
+            # 保存提示工具
             prompt_messages_tools.append(prompt_tool)
-            # save tool entity
+            # 保存工具实体
             tool_instances[dataset_tool.identity.name] = dataset_tool
 
         return tool_instances, prompt_messages_tools
 
     def update_prompt_message_tool(self, tool: Tool, prompt_tool: PromptMessageTool) -> PromptMessageTool:
         """
-        update prompt message tool
+        更新提示消息工具。
+
+        获取工具的运行时参数，并更新提示消息工具的参数。
+
+        :param tool: 工具对象。
+        :param prompt_tool: 提示消息工具对象。
+        :return: 更新后的提示消息工具对象。
         """
-        # try to get tool runtime parameters
+        # 尝试获取工具运行时参数
         tool_runtime_parameters = tool.get_runtime_parameters() or []
 
         for parameter in tool_runtime_parameters:
@@ -287,7 +317,16 @@ class BaseAgentRunner(AppRunner):
         self, message_id: str, message: str, tool_name: str, tool_input: str, messages_ids: list[str]
     ) -> MessageAgentThought:
         """
-        Create agent thought
+        创建代理思考。
+
+        创建一个新的代理思考对象，并将其保存到数据库中。
+
+        :param message_id: 消息ID，标识消息的唯一字符串。
+        :param message: 消息内容，包含消息的文本内容。
+        :param tool_name: 工具名称，标识工具的唯一字符串。
+        :param tool_input: 工具输入，包含工具的输入数据。
+        :param messages_ids: 消息文件ID列表，包含消息文件的唯一ID。
+        :return: 创建的代理思考对象。
         """
         thought = MessageAgentThought(
             message_id=message_id,
@@ -338,7 +377,20 @@ class BaseAgentRunner(AppRunner):
         llm_usage: LLMUsage = None,
     ) -> MessageAgentThought:
         """
-        Save agent thought
+        保存代理思考。
+
+        更新代理思考对象的属性，并将其保存到数据库中。
+
+        :param agent_thought: 代理思考对象。
+        :param tool_name: 工具名称，标识工具的唯一字符串。
+        :param tool_input: 工具输入，包含工具的输入数据。
+        :param thought: 思考内容，包含代理的思考内容。
+        :param observation: 观察内容，包含代理的观察结果。
+        :param tool_invoke_meta: 工具调用元数据，包含工具调用的元数据。
+        :param answer: 回答内容，包含代理的回答内容。
+        :param messages_ids: 消息文件ID列表，包含消息文件的唯一ID。
+        :param llm_usage: 可选参数，LLM使用情况对象，包含LLM的使用情况。
+        :return: 更新后的代理思考对象。
         """
         agent_thought = db.session.query(MessageAgentThought).filter(MessageAgentThought.id == agent_thought.id).first()
 
@@ -382,7 +434,7 @@ class BaseAgentRunner(AppRunner):
             agent_thought.tokens = llm_usage.total_tokens
             agent_thought.total_price = llm_usage.total_price
 
-        # check if tool labels is not empty
+        # 检查工具标签是否为空
         labels = agent_thought.tool_labels or {}
         tools = agent_thought.tool.split(";") if agent_thought.tool else []
         for tool in tools:
@@ -428,14 +480,23 @@ class BaseAgentRunner(AppRunner):
 
     def organize_agent_history(self, prompt_messages: list[PromptMessage]) -> list[PromptMessage]:
         """
-        Organize agent history
+        组织代理历史记录。
+
+        该函数的主要用途是根据给定的提示消息列表和数据库中的消息记录，组织并返回一个包含系统消息、用户消息、助手消息和工具调用消息的列表。
+
+        参数:
+        - prompt_messages: 提示消息列表，包含系统消息和其他提示消息。
+
+        返回值:
+        - 返回一个包含组织后的提示消息的列表。
         """
         result = []
-        # check if there is a system message in the beginning of the conversation
+        # 检查对话开始时是否有系统消息
         for prompt_message in prompt_messages:
             if isinstance(prompt_message, SystemPromptMessage):
                 result.append(prompt_message)
 
+        # 从数据库中查询与当前对话相关的所有消息，并按创建时间升序排列
         messages: list[Message] = (
             db.session.query(Message)
             .filter(
@@ -445,30 +506,39 @@ class BaseAgentRunner(AppRunner):
             .all()
         )
 
+        # 遍历所有消息
         for message in messages:
+            # 跳过当前消息
             if message.id == self.message.id:
                 continue
 
+            # 将用户消息添加到结果列表中
             result.append(self.organize_agent_user_prompt(message))
+            # 获取消息的代理思考记录
             agent_thoughts: list[MessageAgentThought] = message.agent_thoughts
             if agent_thoughts:
                 for agent_thought in agent_thoughts:
                     tools = agent_thought.tool
                     if tools:
+                        # 将工具名称按分号分割
                         tools = tools.split(";")
                         tool_calls: list[AssistantPromptMessage.ToolCall] = []
                         tool_call_response: list[ToolPromptMessage] = []
                         try:
+                            # 尝试解析工具输入
                             tool_inputs = json.loads(agent_thought.tool_input)
                         except Exception as e:
+                            # 如果解析失败，为每个工具创建一个空输入
                             tool_inputs = {tool: {} for tool in tools}
                         try:
+                            # 尝试解析工具响应
                             tool_responses = json.loads(agent_thought.observation)
                         except Exception as e:
+                            # 如果解析失败，为每个工具创建一个默认响应
                             tool_responses = dict.fromkeys(tools, agent_thought.observation)
 
                         for tool in tools:
-                            # generate a uuid for tool call
+                            # 为工具调用生成一个UUID
                             tool_call_id = str(uuid.uuid4())
                             tool_calls.append(
                                 AssistantPromptMessage.ToolCall(
@@ -488,6 +558,7 @@ class BaseAgentRunner(AppRunner):
                                 )
                             )
 
+                        # 将助手消息和工具调用响应添加到结果列表中
                         result.extend(
                             [
                                 AssistantPromptMessage(
@@ -498,37 +569,58 @@ class BaseAgentRunner(AppRunner):
                             ]
                         )
                     if not tools:
+                        # 如果没有工具，直接添加助手消息
                         result.append(AssistantPromptMessage(content=agent_thought.thought))
             else:
+                # 如果没有代理思考记录，直接添加助手消息
                 if message.answer:
                     result.append(AssistantPromptMessage(content=message.answer))
 
+        # 关闭数据库会话
         db.session.close()
 
         return result
 
     def organize_agent_user_prompt(self, message: Message) -> UserPromptMessage:
+        """
+        组织用户提示消息。
+
+        该函数的主要用途是根据给定的消息对象，生成并返回一个包含用户提示消息的对象。
+
+        参数:
+        - message: 消息对象，包含用户查询和相关文件信息。
+
+        返回值:
+        - 返回一个包含用户提示消息的对象。
+        """
+        # 创建消息文件解析器
         message_file_parser = MessageFileParser(
             tenant_id=self.tenant_id,
             app_id=self.app_config.app_id,
         )
 
+        # 获取消息中的文件列表
         files = message.message_files
         if files:
+            # 转换文件上传配置
             file_extra_config = FileUploadConfigManager.convert(message.app_model_config.to_dict())
 
             if file_extra_config:
+                # 转换消息文件
                 file_objs = message_file_parser.transform_message_files(files, file_extra_config)
             else:
                 file_objs = []
 
             if not file_objs:
+                # 如果没有文件对象，直接返回用户查询
                 return UserPromptMessage(content=message.query)
             else:
+                # 创建包含文本和文件内容的提示消息内容列表
                 prompt_message_contents = [TextPromptMessageContent(data=message.query)]
                 for file_obj in file_objs:
                     prompt_message_contents.append(file_obj.prompt_message_content)
 
                 return UserPromptMessage(content=prompt_message_contents)
         else:
+            # 如果没有文件，直接返回用户查询
             return UserPromptMessage(content=message.query)

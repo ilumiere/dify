@@ -31,6 +31,10 @@ if TYPE_CHECKING:
 
 
 class AppRunner:
+    """
+    该类负责应用程序的运行和管理，包括预计算剩余令牌、重新计算最大令牌、组织提示消息、直接输出结果、处理调用结果、输入审查、主机审查、填充外部数据工具输入以及查询应用程序注释以回复等功能。
+    """
+
     def get_pre_calculate_rest_tokens(
         self,
         app_record: App,
@@ -41,22 +45,25 @@ class AppRunner:
         query: Optional[str] = None,
     ) -> int:
         """
-        Get pre calculate rest tokens
-        :param app_record: app record
-        :param model_config: model config entity
-        :param prompt_template_entity: prompt template entity
-        :param inputs: inputs
-        :param files: files
-        :param query: query
-        :return:
+        预计算剩余令牌数。
+
+        :param app_record: 应用程序记录
+        :param model_config: 模型配置实体
+        :param prompt_template_entity: 提示模板实体
+        :param inputs: 输入数据
+        :param files: 文件列表
+        :param query: 查询字符串，默认为None
+        :return: 剩余令牌数
         """
-        # Invoke model
+        # 创建模型实例
         model_instance = ModelInstance(
             provider_model_bundle=model_config.provider_model_bundle, model=model_config.model
         )
 
+        # 获取模型上下文令牌数
         model_context_tokens = model_config.model_schema.model_properties.get(ModelPropertyKey.CONTEXT_SIZE)
 
+        # 初始化最大令牌数
         max_tokens = 0
         for parameter_rule in model_config.model_schema.parameter_rules:
             if parameter_rule.name == "max_tokens" or (
@@ -67,13 +74,15 @@ class AppRunner:
                     or model_config.parameters.get(parameter_rule.use_template)
                 ) or 0
 
+        # 如果模型上下文令牌数为None，返回-1
         if model_context_tokens is None:
             return -1
 
+        # 如果最大令牌数为None，设置为0
         if max_tokens is None:
             max_tokens = 0
 
-        # get prompt messages without memory and context
+        # 获取不带记忆和上下文的提示消息
         prompt_messages, stop = self.organize_prompt_messages(
             app_record=app_record,
             model_config=model_config,
@@ -83,13 +92,14 @@ class AppRunner:
             query=query,
         )
 
+        # 计算提示消息的令牌数
         prompt_tokens = model_instance.get_llm_num_tokens(prompt_messages)
 
+        # 计算剩余令牌数
         rest_tokens = model_context_tokens - max_tokens - prompt_tokens
         if rest_tokens < 0:
             raise InvokeBadRequestError(
-                "Query or prefix prompt is too long, you can reduce the prefix prompt, "
-                "or shrink the max token, or switch to a llm with a larger token limit size."
+                "查询或前缀提示过长，可以减少前缀提示，缩小最大令牌数，或切换到令牌限制更大的模型。"
             )
 
         return rest_tokens
@@ -97,13 +107,21 @@ class AppRunner:
     def recalc_llm_max_tokens(
         self, model_config: ModelConfigWithCredentialsEntity, prompt_messages: list[PromptMessage]
     ):
-        # recalc max_tokens if sum(prompt_token +  max_tokens) over model token limit
+        """
+        重新计算最大令牌数，如果提示令牌数加上最大令牌数超过模型令牌限制。
+
+        :param model_config: 模型配置实体
+        :param prompt_messages: 提示消息列表
+        """
+        # 创建模型实例
         model_instance = ModelInstance(
             provider_model_bundle=model_config.provider_model_bundle, model=model_config.model
         )
 
+        # 获取模型上下文令牌数
         model_context_tokens = model_config.model_schema.model_properties.get(ModelPropertyKey.CONTEXT_SIZE)
 
+        # 初始化最大令牌数
         max_tokens = 0
         for parameter_rule in model_config.model_schema.parameter_rules:
             if parameter_rule.name == "max_tokens" or (
@@ -114,14 +132,18 @@ class AppRunner:
                     or model_config.parameters.get(parameter_rule.use_template)
                 ) or 0
 
+        # 如果模型上下文令牌数为None，返回-1
         if model_context_tokens is None:
             return -1
 
+        # 如果最大令牌数为None，设置为0
         if max_tokens is None:
             max_tokens = 0
 
+        # 计算提示消息的令牌数
         prompt_tokens = model_instance.get_llm_num_tokens(prompt_messages)
 
+        # 如果提示令牌数加上最大令牌数超过模型令牌限制，重新计算最大令牌数
         if prompt_tokens + max_tokens > model_context_tokens:
             max_tokens = max(model_context_tokens - prompt_tokens, 16)
 
@@ -143,18 +165,19 @@ class AppRunner:
         memory: Optional[TokenBufferMemory] = None,
     ) -> tuple[list[PromptMessage], Optional[list[str]]]:
         """
-        Organize prompt messages
-        :param context:
-        :param app_record: app record
-        :param model_config: model config entity
-        :param prompt_template_entity: prompt template entity
-        :param inputs: inputs
-        :param files: files
-        :param query: query
-        :param memory: memory
-        :return:
+        组织提示消息。
+
+        :param app_record: 应用程序记录
+        :param model_config: 模型配置实体
+        :param prompt_template_entity: 提示模板实体
+        :param inputs: 输入数据
+        :param files: 文件列表
+        :param query: 查询字符串，默认为None
+        :param context: 上下文字符串，默认为None
+        :param memory: 记忆对象，默认为None
+        :return: 提示消息列表和停止条件列表
         """
-        # get prompt without memory and context
+        # 获取不带记忆和上下文的提示消息
         if prompt_template_entity.prompt_type == PromptTemplateEntity.PromptType.SIMPLE:
             prompt_transform = SimplePromptTransform()
             prompt_messages, stop = prompt_transform.get_prompt(
@@ -210,14 +233,14 @@ class AppRunner:
         usage: Optional[LLMUsage] = None,
     ) -> None:
         """
-        Direct output
-        :param queue_manager: application queue manager
-        :param app_generate_entity: app generate entity
-        :param prompt_messages: prompt messages
-        :param text: text
-        :param stream: stream
-        :param usage: usage
-        :return:
+        直接输出结果。
+
+        :param queue_manager: 应用程序队列管理器
+        :param app_generate_entity: 应用程序生成实体
+        :param prompt_messages: 提示消息列表
+        :param text: 文本内容
+        :param stream: 是否流式输出
+        :param usage: 使用情况，默认为None
         """
         if stream:
             index = 0
@@ -252,12 +275,12 @@ class AppRunner:
         agent: bool = False,
     ) -> None:
         """
-        Handle invoke result
-        :param invoke_result: invoke result
-        :param queue_manager: application queue manager
-        :param stream: stream
-        :param agent: agent
-        :return:
+        处理调用结果。
+
+        :param invoke_result: 调用结果
+        :param queue_manager: 应用程序队列管理器
+        :param stream: 是否流式输出
+        :param agent: 是否为代理，默认为False
         """
         if not stream:
             self._handle_invoke_result_direct(invoke_result=invoke_result, queue_manager=queue_manager, agent=agent)
@@ -268,11 +291,11 @@ class AppRunner:
         self, invoke_result: LLMResult, queue_manager: AppQueueManager, agent: bool
     ) -> None:
         """
-        Handle invoke result direct
-        :param invoke_result: invoke result
-        :param queue_manager: application queue manager
-        :param agent: agent
-        :return:
+        直接处理调用结果。
+
+        :param invoke_result: 调用结果
+        :param queue_manager: 应用程序队列管理器
+        :param agent: 是否为代理
         """
         queue_manager.publish(
             QueueMessageEndEvent(
@@ -285,11 +308,11 @@ class AppRunner:
         self, invoke_result: Generator, queue_manager: AppQueueManager, agent: bool
     ) -> None:
         """
-        Handle invoke result
-        :param invoke_result: invoke result
-        :param queue_manager: application queue manager
-        :param agent: agent
-        :return:
+        流式处理调用结果。
+
+        :param invoke_result: 调用结果
+        :param queue_manager: 应用程序队列管理器
+        :param agent: 是否为代理
         """
         model = None
         prompt_messages = []
@@ -336,14 +359,15 @@ class AppRunner:
         message_id: str,
     ) -> tuple[bool, dict, str]:
         """
-        Process sensitive_word_avoidance.
-        :param app_id: app id
-        :param tenant_id: tenant id
-        :param app_generate_entity: app generate entity
-        :param inputs: inputs
-        :param query: query
-        :param message_id: message id
-        :return:
+        处理输入的敏感词审查。
+
+        :param app_id: 应用程序ID
+        :param tenant_id: 租户ID
+        :param app_generate_entity: 应用程序生成实体
+        :param inputs: 输入数据
+        :param query: 查询字符串
+        :param message_id: 消息ID
+        :return: 审查结果、审查数据和审查消息
         """
         moderation_feature = InputModeration()
         return moderation_feature.check(
@@ -363,11 +387,12 @@ class AppRunner:
         prompt_messages: list[PromptMessage],
     ) -> bool:
         """
-        Check hosting moderation
-        :param application_generate_entity: application generate entity
-        :param queue_manager: queue manager
-        :param prompt_messages: prompt messages
-        :return:
+        检查主机审查。
+
+        :param application_generate_entity: 应用程序生成实体
+        :param queue_manager: 队列管理器
+        :param prompt_messages: 提示消息列表
+        :return: 审查结果
         """
         hosting_moderation_feature = HostingModerationFeature()
         moderation_result = hosting_moderation_feature.check(
@@ -394,14 +419,14 @@ class AppRunner:
         query: str,
     ) -> dict:
         """
-        Fill in variable inputs from external data tools if exists.
+        从外部数据工具填充变量输入（如果存在）。
 
-        :param tenant_id: workspace id
-        :param app_id: app id
-        :param external_data_tools: external data tools configs
-        :param inputs: the inputs
-        :param query: the query
-        :return: the filled inputs
+        :param tenant_id: 工作区ID
+        :param app_id: 应用程序ID
+        :param external_data_tools: 外部数据工具配置
+        :param inputs: 输入数据
+        :param query: 查询字符串
+        :return: 填充后的输入数据
         """
         external_data_fetch_feature = ExternalDataFetch()
         return external_data_fetch_feature.fetch(
@@ -412,13 +437,14 @@ class AppRunner:
         self, app_record: App, message: Message, query: str, user_id: str, invoke_from: InvokeFrom
     ) -> Optional[MessageAnnotation]:
         """
-        Query app annotations to reply
-        :param app_record: app record
-        :param message: message
-        :param query: query
-        :param user_id: user id
-        :param invoke_from: invoke from
-        :return:
+        查询应用程序注释以回复。
+
+        :param app_record: 应用程序记录
+        :param message: 消息
+        :param query: 查询字符串
+        :param user_id: 用户ID
+        :param invoke_from: 调用来源
+        :return: 消息注释
         """
         annotation_reply_feature = AnnotationReplyFeature()
         return annotation_reply_feature.query(
