@@ -30,10 +30,30 @@ _TEXT_COLOR_MAPPING = {
 
 
 class WorkflowLoggingCallback(WorkflowCallback):
+    """
+    工作流日志回调类，用于处理和记录工作流事件。
+
+    该类继承自 `WorkflowCallback`，并提供了多种方法来处理不同类型的工作流事件，并将这些事件记录到控制台。
+    """
+
     def __init__(self) -> None:
+        """
+        初始化 `WorkflowLoggingCallback` 实例。
+
+        属性:
+        - `current_node_id`: 当前节点的ID，初始值为 `None`。
+        """
         self.current_node_id = None
 
     def on_event(self, event: GraphEngineEvent) -> None:
+        """
+        处理工作流事件的方法。
+
+        参数:
+        - `event`: 工作流事件对象，类型为 `GraphEngineEvent`。
+
+        该方法根据事件的类型调用相应的方法来处理事件，并将事件信息记录到控制台。
+        """
         if isinstance(event, GraphRunStartedEvent):
             self.print_text("\n[GraphRunStartedEvent]", color="pink")
         elif isinstance(event, GraphRunSucceededEvent):
@@ -63,7 +83,12 @@ class WorkflowLoggingCallback(WorkflowCallback):
 
     def on_workflow_node_execute_started(self, event: NodeRunStartedEvent) -> None:
         """
-        Workflow node execute started
+        处理节点执行开始事件的方法。
+
+        参数:
+        - `event`: 节点执行开始事件对象，类型为 `NodeRunStartedEvent`。
+
+        该方法将节点执行开始的信息记录到控制台。
         """
         self.print_text("\n[NodeRunStartedEvent]", color="yellow")
         self.print_text(f"Node ID: {event.node_id}", color="yellow")
@@ -72,7 +97,12 @@ class WorkflowLoggingCallback(WorkflowCallback):
 
     def on_workflow_node_execute_succeeded(self, event: NodeRunSucceededEvent) -> None:
         """
-        Workflow node execute succeeded
+        处理节点执行成功事件的方法。
+
+        参数:
+        - `event`: 节点执行成功事件对象，类型为 `NodeRunSucceededEvent`。
+
+        该方法将节点执行成功的信息记录到控制台，并输出节点的输入、处理数据、输出和元数据。
         """
         route_node_state = event.route_node_state
 
@@ -103,7 +133,12 @@ class WorkflowLoggingCallback(WorkflowCallback):
 
     def on_workflow_node_execute_failed(self, event: NodeRunFailedEvent) -> None:
         """
-        Workflow node execute failed
+        处理节点执行失败事件的方法。
+
+        参数:
+        - `event`: 节点执行失败事件对象，类型为 `NodeRunFailedEvent`。
+
+        该方法将节点执行失败的信息记录到控制台，并输出节点的错误信息、输入、处理数据和输出。
         """
         route_node_state = event.route_node_state
 
@@ -131,7 +166,12 @@ class WorkflowLoggingCallback(WorkflowCallback):
 
     def on_node_text_chunk(self, event: NodeRunStreamChunkEvent) -> None:
         """
-        Publish text chunk
+        处理节点文本块事件的方法。
+
+        参数:
+        - `event`: 节点文本块事件对象，类型为 `NodeRunStreamChunkEvent`。
+
+        该方法将节点文本块的信息记录到控制台，并输出节点的元数据和文本块内容。
         """
         route_node_state = event.route_node_state
         if not self.current_node_id or self.current_node_id != route_node_state.node_id:
@@ -149,7 +189,12 @@ class WorkflowLoggingCallback(WorkflowCallback):
 
     def on_workflow_parallel_started(self, event: ParallelBranchRunStartedEvent) -> None:
         """
-        Publish parallel started
+        处理并行分支开始事件的方法。
+
+        参数:
+        - `event`: 并行分支开始事件对象，类型为 `ParallelBranchRunStartedEvent`。
+
+        该方法将并行分支开始的信息记录到控制台，并输出并行ID、分支ID和迭代ID（如果有）。
         """
         self.print_text("\n[ParallelBranchRunStartedEvent]", color="blue")
         self.print_text(f"Parallel ID: {event.parallel_id}", color="blue")
@@ -161,7 +206,12 @@ class WorkflowLoggingCallback(WorkflowCallback):
         self, event: ParallelBranchRunSucceededEvent | ParallelBranchRunFailedEvent
     ) -> None:
         """
-        Publish parallel completed
+        处理并行分支完成事件的方法。
+
+        参数:
+        - `event`: 并行分支完成事件对象，类型为 `ParallelBranchRunSucceededEvent` 或 `ParallelBranchRunFailedEvent`。
+
+        该方法将并行分支完成的信息记录到控制台，并输出并行ID、分支ID和迭代ID（如果有），以及错误信息（如果失败）。
         """
         if isinstance(event, ParallelBranchRunSucceededEvent):
             color = "blue"
@@ -184,14 +234,24 @@ class WorkflowLoggingCallback(WorkflowCallback):
 
     def on_workflow_iteration_started(self, event: IterationRunStartedEvent) -> None:
         """
-        Publish iteration started
+        处理迭代开始事件的方法。
+
+        参数:
+        - `event`: 迭代开始事件对象，类型为 `IterationRunStartedEvent`。
+
+        该方法将迭代开始的信息记录到控制台，并输出迭代节点ID。
         """
         self.print_text("\n[IterationRunStartedEvent]", color="blue")
         self.print_text(f"Iteration Node ID: {event.iteration_id}", color="blue")
 
     def on_workflow_iteration_next(self, event: IterationRunNextEvent) -> None:
         """
-        Publish iteration next
+        处理迭代下一步事件的方法。
+
+        参数:
+        - `event`: 迭代下一步事件对象，类型为 `IterationRunNextEvent`。
+
+        该方法将迭代下一步的信息记录到控制台，并输出迭代节点ID和迭代索引。
         """
         self.print_text("\n[IterationRunNextEvent]", color="blue")
         self.print_text(f"Iteration Node ID: {event.iteration_id}", color="blue")
@@ -199,7 +259,12 @@ class WorkflowLoggingCallback(WorkflowCallback):
 
     def on_workflow_iteration_completed(self, event: IterationRunSucceededEvent | IterationRunFailedEvent) -> None:
         """
-        Publish iteration completed
+        处理迭代完成事件的方法。
+
+        参数:
+        - `event`: 迭代完成事件对象，类型为 `IterationRunSucceededEvent` 或 `IterationRunFailedEvent`。
+
+        该方法将迭代完成的信息记录到控制台，并输出节点ID。
         """
         self.print_text(
             "\n[IterationRunSucceededEvent]"
@@ -210,11 +275,31 @@ class WorkflowLoggingCallback(WorkflowCallback):
         self.print_text(f"Node ID: {event.iteration_id}", color="blue")
 
     def print_text(self, text: str, color: Optional[str] = None, end: str = "\n") -> None:
-        """Print text with highlighting and no end characters."""
+        """
+        打印带有高亮和无结束字符的文本。
+
+        参数:
+        - `text`: 要打印的文本，类型为 `str`。
+        - `color`: 文本的颜色，类型为 `Optional[str]`，默认为 `None`。
+        - `end`: 打印文本后的结束字符，类型为 `str`，默认为 `\n`。
+
+        该方法根据颜色参数生成带有颜色的文本，并将其打印到控制台。
+        """
         text_to_print = self._get_colored_text(text, color) if color else text
         print(f"{text_to_print}", end=end)
 
     def _get_colored_text(self, text: str, color: str) -> str:
-        """Get colored text."""
+        """
+        获取带有颜色的文本。
+
+        参数:
+        - `text`: 要着色的文本，类型为 `str`。
+        - `color`: 文本的颜色，类型为 `str`。
+
+        返回值:
+        - 带有颜色的文本，类型为 `str`。
+
+        该方法根据颜色映射表生成带有颜色的文本。
+        """
         color_str = _TEXT_COLOR_MAPPING[color]
         return f"\u001b[{color_str}m\033[1;3m{text}\u001b[0m"
